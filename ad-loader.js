@@ -1,26 +1,121 @@
 (function() {
-    // 1. Apni sites.json ka link yahan lagayen
+    // 1. Apni sites.json ka link
     const sitesListUrl = "https://msklyar.github.io/my-ad-system/sites.json"; 
-
+    
+    // Ad Container dhoondna
     const adContainer = document.getElementById("my-github-ad");
     if (!adContainer) return;
 
-    // Step 1: Website List lana
+    // 2. Google Style CSS Inject karna (Ye ad ko responsive banayega)
+    const style = document.createElement('style');
+    style.innerHTML = `
+        #my-github-ad {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            width: 100%;
+            display: block;
+            margin-bottom: 20px;
+        }
+        .g-ad-card {
+            display: flex;
+            background: #fff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 1px 2px rgba(60,64,67,0.3);
+            transition: box-shadow 0.2s;
+        }
+        .g-ad-card:hover {
+            box-shadow: 0 1px 3px 1px rgba(60,64,67,0.15), 0 1px 2px rgba(60,64,67,0.3);
+        }
+        /* Mobile View (Default) - Image upar, Text neeche */
+        .g-ad-content-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .g-ad-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #f1f3f4;
+        }
+        .g-ad-text {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        /* Desktop/Tablet View - Agar jagah zyada ho to side-by-side */
+        @media (min-width: 480px) {
+            .g-ad-content-wrapper {
+                flex-direction: row;
+                height: 140px; /* Fixed height for horizontal banner look */
+            }
+            .g-ad-image {
+                width: 35%; /* Image left side par 35% jagah legi */
+                height: 100%;
+                min-width: 120px;
+            }
+            .g-ad-text {
+                width: 65%;
+                padding: 10px 15px;
+            }
+        }
+
+        .g-ad-title {
+            margin: 0 0 5px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #202124;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .g-ad-desc {
+            margin: 0;
+            font-size: 13px;
+            color: #5f6368;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* Sirf 2 lines dikhana */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .g-ad-meta {
+            margin-top: auto; /* Bottom par push karna */
+            padding-top: 8px;
+            font-size: 11px;
+            color: #1a73e8; /* Google Blue */
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+        .g-badge {
+            background: #f1f3f4;
+            color: #5f6368;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 8px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // --- Data Fetching Logic (Same as before but optimized) ---
     fetch(sitesListUrl)
         .then(res => res.json())
         .then(sites => {
             if (!sites || sites.length === 0) return;
-
-            // Random Website Select karna
             let randomSite = sites[Math.floor(Math.random() * sites.length)];
-            
-            // URL clean karna (akhir mein slash / ho to hata dena)
             randomSite = randomSite.replace(/\/$/, "");
-
-            // Step 2: Us Website ki Feed (Latest Posts) lana
-            // Note: Ye code Blogger websites ke liye best hai
-            const feedUrl = `${randomSite}/feeds/posts/default?alt=json&max-results=15`;
-
+            // Blogger JSON Feed URL
+            const feedUrl = `${randomSite}/feeds/posts/default?alt=json&max-results=20`;
             return fetch(feedUrl);
         })
         .then(res => res.json())
@@ -28,58 +123,51 @@
             const posts = data.feed.entry;
             if (!posts || posts.length === 0) return;
 
-            // Step 3: Us Website se Random Post uthana
             const randomPost = posts[Math.floor(Math.random() * posts.length)];
 
-            // Data Extract karna (Title, Image, Link, Summary)
+            // Data Extraction
             const title = randomPost.title.$t;
-            
-            // Link dhoondna
             let link = "#";
-            for (let i = 0; i < randomPost.link.length; i++) {
-                if (randomPost.link[i].rel === "alternate") {
-                    link = randomPost.link[i].href;
-                    break;
-                }
+            if (randomPost.link) {
+                const linkObj = randomPost.link.find(l => l.rel === 'alternate');
+                if (linkObj) link = linkObj.href;
             }
 
-            // Image dhoondna (Agar ho, nahi to default lagana)
-            let image = "https://via.placeholder.com/300x200?text=No+Image";
+            // Image Extraction
+            let image = "https://via.placeholder.com/300x200?text=Visit+Site";
             if (randomPost.media$thumbnail) {
-                image = randomPost.media$thumbnail.url.replace("s72-c", "w300-h200-p"); // High quality image
+                // High quality image trick
+                image = randomPost.media$thumbnail.url.replace("s72-c", "w400-h300-p");
+            } else {
+                // Try to find image in content content if thumbnail is missing
+                const content = randomPost.content ? randomPost.content.$t : "";
+                const imgMatch = content.match(/src="([^"]+)"/);
+                if(imgMatch) image = imgMatch[1];
             }
 
-            // Text Summary (Thora sa text)
+            // Text Description
             let text = "";
-            if (randomPost.summary) {
-                text = randomPost.summary.$t;
-            } else if (randomPost.content) {
-                // Agar summary na ho to content se text nikalna (HTML tags hata kar)
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = randomPost.content.$t;
-                text = tempDiv.textContent || tempDiv.innerText || "";
+            if (randomPost.summary) text = randomPost.summary.$t;
+            else if (randomPost.content) {
+                const div = document.createElement("div");
+                div.innerHTML = randomPost.content.$t;
+                text = div.textContent || div.innerText || "";
             }
-            // Text ko 2 lines tak katna
-            const shortText = text.length > 90 ? text.substring(0, 90) + "..." : text;
+            const cleanText = text.replace(/&nbsp;/g, ' ').substring(0, 150);
+            
+            // Domain Name extract karna (Display ke liye)
+            const domain = new URL(link).hostname.replace('www.', '');
 
-            // Step 4: Ad HTML Banana
+            // HTML Structure (Responsive Classes ke sath)
             const adHTML = `
-                <a href="${link}" target="_blank" style="text-decoration: none; color: inherit;">
-                    <div style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; max-width: 300px; font-family: 'Arial', sans-serif; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12); margin-bottom: 15px;">
-                        
-                        <!-- Thumbnail -->
-                        <div style="height: 160px; overflow: hidden; background: #f1f1f1;">
-                            <img src="${image}" style="width: 100%; height: 100%; object-fit: cover;" alt="${title}">
-                        </div>
-                        
-                        <!-- Content -->
-                        <div style="padding: 12px;">
-                            <h3 style="margin: 0 0 6px; font-size: 16px; color: #202124; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${title}</h3>
-                            <p style="margin: 0; font-size: 14px; color: #5f6368; line-height: 1.4; height: 40px; overflow: hidden;">
-                                ${shortText}
-                            </p>
-                            <div style="margin-top: 10px; font-size: 11px; color: #006621; font-weight: bold; text-transform: uppercase;">
-                                Ad &bull; ${new URL(randomSite).hostname}
+                <a href="${link}" target="_blank" class="g-ad-card">
+                    <div class="g-ad-content-wrapper">
+                        <img src="${image}" class="g-ad-image" alt="${title}">
+                        <div class="g-ad-text">
+                            <h3 class="g-ad-title">${title}</h3>
+                            <p class="g-ad-desc">${cleanText}</p>
+                            <div class="g-ad-meta">
+                                <span class="g-badge">Ad</span> ${domain} &bull; Open
                             </div>
                         </div>
                     </div>
@@ -90,7 +178,6 @@
         })
         .catch(err => {
             console.error("Ad System Error:", err);
-            // Agar error aye to container chupana
-            if(adContainer) adContainer.style.display = 'none';
+            adContainer.style.display = 'none';
         });
 })();
